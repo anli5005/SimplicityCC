@@ -1,0 +1,22 @@
+function Process(theFunc)
+  local self = {
+    co = coroutine.create(function() end),
+    title = "",
+    processName = "",
+    window = nil,
+    yieldArguments = {},
+    
+    setFunction = function(self, theFunction)
+      self.co = coroutine.create(theFunction)
+    end,
+    resume = function(self, ...)
+      if self.window then
+        term.redirect(self.window)
+      end
+      self.yieldArguments = {coroutine.resume(self.co, ...)}
+      return self.yieldArguments
+    end
+  }
+  if theFunc then self:setFunction(theFunc) end
+  return self
+end
