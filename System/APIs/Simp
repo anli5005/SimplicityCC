@@ -1,0 +1,87 @@
+function Thread(theFunc)
+  local self = {
+    co = coroutine.create(function() end),
+    title = "",
+    window = nil,
+    yieldArguments = {},
+    
+    setFunction = function(self, theFunction)
+      self.co = coroutine.create(theFunction)
+    end,
+    resume = function(self, ...)
+      if self.window then
+        term.redirect(self.window)
+      end
+      self.yieldArguments = {coroutine.resume(self.co, ...)}
+      return unpack(self.yieldArguments)
+    end,
+    status = function(self)
+      return coroutine.status(self.co)
+    end
+  }
+  if theFunc then self:setFunction(theFunc) end
+  return self
+end
+
+function ThreadQueue(...)
+  local self = {
+    parentTerm = term.current(),
+    processes = {...},
+    
+    handleError = function(self, process, error)
+      printError(error)
+      -- The error handler
+      -- Usual behavior is using printError()
+      -- But you can override it
+      -- So you can create your own error handler
+    end,
+    handleAction = function(self, process, action, ...)
+      -- In a subclass, respond to actions
+      -- They are sent by the child process
+    end,
+    
+    addProcess = function(self, process)
+      self.processes[#self.processes+1] = process
+    end,
+    resumeProcess = function(self, processN, ...)            local rArgs = {...}
+      local process = self.processes[processN]
+      local yArgs = process.yieldArguments
+      local rArgs = {...}
+      local e = rArgs[1]
+      local f = yArgs[2]
+      if e == nil or e == f or f == nil or f == "" then
+        -- Resume the process
+        local theArgs = {process:resume(...)}
+        process.window = term.current()
+        local ok = theArgs[1]
+        local result = theArgs[2]
+        local action = theArgs[3]
+        if not ok then
+          self:handleError(process, result)
+          return
+        end
+        if result == "" and not (action == nil) then
+          local args = {self:handleAction(process, action, unpack(theArgs, 4))}
+          self:resumeProcess(processN, action, unpack(args, 4))
+        end
+      end
+    end,
+    
+    handleEvent = function(self, event, ...)
+      for k,p in ipairs(self.processes) do
+        self:resumeProcess(p, event, ...)
+      end
+    end,
+    didCullProcess = function(self, processN, process)
+      -- This method lets a subclass respond to process culling
+      -- Do stuff here like removing windows and etc.
+      -- Note: This is called before the process is set to 'nil'
+    end,
+    
+    cullProcess = function(self, processN)
+      local process = self.processes[processN]
+      
+    end
+  }
+  return self
+end
